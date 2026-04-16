@@ -6,7 +6,6 @@ An OpenClaw skill that allows AI agents to search TikTok videos and retrieve det
 
 1.  **Browser Bridge**: This skill uses `@gecho-ai/gecho-bridge` to communicate with your local Chrome browser.
 2.  **Automated Scraping**: It triggers searches and auto-scrolls in the active TikTok tab to collect results.
-3.  **Local Storage**: Results are saved to your local `data/` directory for persistence.
 
 ## Prerequisites
 
@@ -22,7 +21,6 @@ openclaw skill install tiktok-search
 ## Core Features
 
 - **Deep Search**: Fetches up to 200 results per query.
-- **Auto-Sorting**: Returns the top 20 most-liked videos directly to the AI.
 - **Zero Configuration**: Powered by `npx`, no manual bridge setup required.
 
 ## License
