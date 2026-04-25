@@ -33,12 +33,18 @@ Extracts video metadata from TikTok by bridging to a local Chrome browser extens
 **Service Initialization Strategy:**
 Depending on your Agent framework (e.g., OpenClaw, HermesAgent, Claude Desktop), the bridge service may or may not start automatically. You must follow this strategy:
 
-1. **Check Tool Availability**: First, check if the MCP tool `tiktok_search_top_200` is already available to you.
+1. **Check Tool Availability**: First, check if the MCP tool `tiktok_search` is already available to you.
 2. **If Available (e.g., OpenClaw)**: Call the tool directly. **NEVER** attempt to run this as a shell command (like `npx`). The bridge service starts automatically.
 3. **If NOT Available (e.g., HermesAgent, Claude Desktop, Cline)**: 
-   - **Attempt 1: Auto-Configuration via CLI & Restart**: 
-     - **For Hermes Agent**: Run the native CLI command: `hermes mcp add gecho-bridge --command npx --args="-y" --args="@gecho-ai/gecho-bridge@latest"`.
-     - **For OpenClaw (if not auto-loaded)**: Run the native CLI command: `openclaw mcp set gecho-bridge '{"command":"npx","args":["-y","@gecho-ai/gecho-bridge@latest"]}'`.
+   - **Attempt 1: Auto-Configuration via File & Restart**: 
+     - **For Hermes Agent**: You MUST automatically add the MCP server configuration to the user's `~/.hermes/config.yaml` file. Use your file editing tools to append the following to the `mcp_servers` section:
+       ```yaml
+       mcp_servers:
+         gecho_bridge:
+           command: "npx"
+           args: ["-y", "@gecho-ai/gecho-bridge@latest"]
+       ```
+       *(If the file or `mcp_servers` key doesn't exist, create it).*
      - **For Claude Desktop / Cline**: Proactively locate the config file (like `claude_desktop_config.json` or `.vscode/cline_mcp_settings.json`), read it, and inject the following under `mcpServers`:
        ```json
        "gecho-bridge": {
@@ -52,7 +58,7 @@ Depending on your Agent framework (e.g., OpenClaw, HermesAgent, Claude Desktop),
      ```bash
      npx -y @gecho-ai/gecho-bridge@latest
      ```
-     Wait a few seconds for initialization, then check if `tiktok_search_top_200` becomes available. If it still doesn't, inform the user that their platform might not support dynamic tool loading.
+     Wait a few seconds for initialization, then check if `tiktok_search` becomes available. If it still doesn't, inform the user that their platform might not support dynamic tool loading.
 
 ### Prerequisites Check & Environment Setup
 Before calling, ensure the following prerequisites are met. If the `node` or `npx` commands are missing, the AI should **proactively offer to install Node.js** for the user based on their OS:
@@ -62,13 +68,15 @@ Before calling, ensure the following prerequisites are met. If the `node` or `np
 *(Always ask for user permission before executing any installation commands.)*
 
 1. **Node.js**: Installed in the local environment.
-2. **Gecho TikTok Extension**: Chrome extension is installed and active.
-3. **Active Tab**: A browser tab is open and can access TikTok.
+2. **Gecho TikTok Extension & Active Tab**: The **USER** must have Chrome open locally with the extension active and a TikTok tab open. 
+
+**⚠️ CRITICAL AGENT INSTRUCTION:**
+You (the Agent) MUST NOT attempt to install Chrome, open browsers, or use tools like `browser_navigate` to fulfill these prerequisites. Do NOT check for Chrome yourself. Your ONLY responsibility is to call the MCP tool.
 
 ## Input Format
 
 **Tool Parameters:**
-*(Note: Depending on your host Agent framework, the tool name might be prefixed, e.g., `mcp_gecho_bridge_tiktok_search_top_200` in Hermes. Always search your available tools for `tiktok_search` before calling).*
+*(Note: Depending on your host Agent framework, the tool name might be prefixed. For example, in Hermes it is EXACTLY `mcp_gecho_bridge_tiktok_search`. Do NOT use `tiktok_insight` or any other tool variants).*
 - `query` (string, required): The search keyword (e.g., "cooking tips", "travel vlogs").
 - `save_dir` (string, optional): Absolute path to save the results JSON. *Best Practice: Always proactively generate a safe, timestamped absolute path in the current workspace (e.g., `/absolute/path/to/workspace/tiktok_travel_vlogs_1690000000.json`) so the user doesn't lose the raw data.*
 
@@ -93,9 +101,9 @@ A JSON array containing video metadata. Expected structure:
 ## Execution Rules & Constraints (CRITICAL)
 
 You MUST strictly adhere to the following rules when calling the MCP tool:
-1. **Strict Tool Binding (No Fallbacks)**: You MUST ONLY use the `tiktok_search_top_200` tool for TikTok searches. If the tool execution fails, times out, or returns an error, you MUST NOT attempt to use any other tools (like generic WebSearch, Bing, Google, or writing python scrapers) to find the information.
-2. **Fail Fast**: If the tool fails, STOP the task immediately. Return the exact error message to the user and wait for their instructions. Do NOT try to be "helpful" by finding alternative ways to complete the task.
-3. **No Parallel Execution**: Since this tool controls an active Chrome tab, it is strictly single-threaded. You MUST NEVER execute multiple `tiktok_search_top_200` tool calls in parallel simultaneously. You must wait for one search to completely finish before starting another.
+1. **Strict Tool Binding (No Fallbacks)**: You MUST ONLY use the EXACT tool specified (e.g., `mcp_gecho_bridge_tiktok_search`) for TikTok searches. You are **STRICTLY FORBIDDEN** from using built-in browser tools (like `browser_navigate`, `puppeteer`, etc.), generic WebSearch, Bing, Google, or writing Python scrapers to visit TikTok.com. 
+2. **Fail Fast & Explicit Reporting**: If the MCP tool fails, times out, or throws an error (e.g., `params is not defined`), you MUST STOP immediately. Do NOT try other MCP tools (like `tiktok_insight`). Do NOT offer alternative web search solutions. You MUST output the raw error message to the user.
+3. **No Parallel Execution**: Since this tool controls an active Chrome tab, it is strictly single-threaded. You MUST NEVER execute multiple `tiktok_search` tool calls in parallel simultaneously. You must wait for one search to completely finish before starting another.
 4. **Anti-Hallucination (No Fake Data)**: You MUST base your final response ONLY on the exact data returned by the tool. If the tool returns empty results (`[]`), you MUST NOT hallucinate or guess. Inform the user exactly what the tool returned.
 5. **Anti-Spam (No Infinite Loops)**: NEVER call the tool repeatedly with the exact same `query` if it fails or returns empty results.
 6. **Max Retries**: If a call fails due to a timeout or network error, you are allowed a MAXIMUM of 1 retry. If the retry also fails, STOP immediately.
@@ -104,7 +112,7 @@ You MUST strictly adhere to the following rules when calling the MCP tool:
 
 ## Troubleshooting & Error Handling (Decision Tree)
 
-If the `tiktok_search_top_200` tool execution fails, follow this decision tree to assist the user:
+If the `tiktok_search` tool execution fails, follow this decision tree to assist the user:
 
 1. **Error: "Chrome extension not found/connected"**
    - → Inform the user: *"Please ensure the Gecho TikTok Chrome extension is installed, enabled, and you have an active TikTok tab open in Chrome."*
@@ -118,13 +126,13 @@ If the `tiktok_search_top_200` tool execution fails, follow this decision tree t
 When a user requests a TikTok search, follow this exact 5-step workflow:
 1. **Pre-flight**: Silently verify the tool is available (initialize via the strategy above if needed).
 2. **Determine Path**: Proactively generate a valid absolute path for `save_dir` based on the user's OS and current workspace.
-3. **Execute**: Call `tiktok_search_top_200` with the `query` and `save_dir`.
+3. **Execute**: Call `tiktok_search` with the `query` and `save_dir`.
 4. **Process**: Wait for the JSON array.
 5. **Report**: Inform the user where the raw JSON file was saved, and output a concise Markdown summary table (Title, Likes, Author, URL) for the top 3-5 videos only.
 
 Example:
 "Find trending videos for 'travel vlogs'"
-→ Action: Call `tiktok_search_top_200` with `query="travel vlogs"` and `save_dir="/path/to/workspace/travel_vlogs_results.json"`
+→ Action: Call `tiktok_search` with `query="travel vlogs"` and `save_dir="/path/to/workspace/travel_vlogs_results.json"`
 
 ## Limitations
 
